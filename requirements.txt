@@ -5,3 +5,4 @@ requests==2.20.0
 Unidecode==1.0.22
 closeio==2.0
 gevent==22.10.2
+basecrm==1.2.9
