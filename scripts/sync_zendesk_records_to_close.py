@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import json
+import sys
 
 from closeio_api import APIError
 from CloseApiWrapper import CloseApiWrapper
@@ -46,6 +47,9 @@ elif args.env == "prod":
         "custom.cf_ntTSow5AspSigwP4YgCo3lwIy8Fs7WWBi7pO8HszLLh"
     )
     healthie_user_id_field_id = "custom.cf_8ziVuLyvS1SE5dkH2QS6h919rMvs1uRDepx5ORwRd12"
+else:
+    print("Unsupported environment")
+    sys.exit(1)
 
 
 def create_user_id_mapping():

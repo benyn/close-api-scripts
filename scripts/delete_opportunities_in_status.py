@@ -26,6 +26,9 @@ if args.environment:
     api_key = get_api_key("api.close.com", f"admin_{args.environment}")
 elif args.api_key:
     api_key = args.api_key
+else:
+    print("Either environment or API key must be provided.")
+    sys.exit(1)
 
 api = CloseApiWrapper(api_key)
 

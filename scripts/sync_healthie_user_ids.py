@@ -46,7 +46,7 @@ elif args.env == "prod":
     healthie_user_id_field_id = "custom.cf_8ziVuLyvS1SE5dkH2QS6h919rMvs1uRDepx5ORwRd12"
 else:
     print("Unsupported environment")
-    sys.exit(0)
+    sys.exit(1)
 
 close_leads = close.get_all_items(
     "lead",

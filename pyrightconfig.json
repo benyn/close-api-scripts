@@ -2,8 +2,19 @@
   "exclude": [
     "**/node_modules",
     "**/__pycache__",
+    "**/venv",
     "src/experimental",
-    "src/typestubs"
+    "src/typestubs",
+    "scripts/bulk_*.py",
+    "scripts/clone_organization.py",
+    "scripts/csv_to_cio.py",
+    "scripts/custom_field_change_report.py",
+    "scripts/delete_emails_from_contacts.py",
+    "scripts/move_custom_field_to_contact_info.py",
+    "scripts/restore_deleted_leads.py",
+    "scripts/run_leads_merged_report.py",
+    "scripts/time_to_respond_report.py",
+    "scripts/user_reassign.py"
   ],
   "defineConstant": {
     "DEBUG": true

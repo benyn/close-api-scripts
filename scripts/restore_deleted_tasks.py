@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 
 import gevent.monkey
 
@@ -12,7 +13,7 @@ from utils.get_api_key import get_api_key
 parser = argparse.ArgumentParser(description="Restore an array of deleted tasks by ID.")
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument(
-    "--environment",
+    "--env",
     "-e",
     choices=["dev", "prod"],
     help="Target environment (dev/prod)",
@@ -28,10 +29,13 @@ group.add_argument(
 )
 args = parser.parse_args()
 
-if args.environment:
-    api_key = get_api_key("api.close.com", f"admin_{args.environment}")
+if args.env:
+    api_key = get_api_key("api.close.com", f"admin_{args.env}")
 elif args.api_key:
     api_key = args.api_key
+else:
+    print("Either environment or API key must be provided.")
+    sys.exit(1)
 
 api = CloseIO_API(api_key)
 
@@ -43,6 +47,9 @@ elif args.tasks_file:
         lines = f.readlines()
     task_ids = [el.strip() for el in lines]  # Strip new lines
     task_ids = list(filter(None, task_ids))  # Strip empty lines
+else:
+    print("Either tasks or tasks_file must be provided.")
+    sys.exit(1)
 
 # Create a list of active users for the sake of posting opps.
 org_id = api.get("me")["organizations"][0]["id"]

@@ -30,7 +30,7 @@ elif args.api_key:
     api_key = args.api_key
 else:
     print("Either environment or API key must be provided.")
-    sys.exit(0)
+    sys.exit(1)
 
 api = CloseApiWrapper(api_key)
 
