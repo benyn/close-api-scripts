@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(
 )
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument(
-    "--environment",
+    "--env",
     "-e",
     choices=["dev", "prod"],
     help="Target environment (dev/prod)",
@@ -20,12 +20,17 @@ group.add_argument("--api-key", "-k", help="API Key")
 parser.add_argument(
     "--verbose", "-v", action="store_true", help="Increase logging verbosity."
 )
+parser.add_argument("--creator", "-c", help="Filter tasks by creator name")
+parser.add_argument("--assignee", "-o", help="Filter tasks by assignee name")
 args = parser.parse_args()
 
-if args.environment:
-    api_key = get_api_key("api.close.com", f"admin_{args.environment}")
+if args.env:
+    api_key = get_api_key("api.close.com", f"admin_{args.env}")
 elif args.api_key:
     api_key = args.api_key
+else:
+    print("Either environment or API key must be provided.")
+    sys.exit(0)
 
 api = CloseApiWrapper(api_key)
 
@@ -56,11 +61,13 @@ regex = re.compile(pattern)
 filtered_tasks = [
     task
     for task in tasks
-    if task["created_by_name"] == "Yok Kanya" or regex.match(task["text"])
+    if (not args.creator or task["created_by_name"] == args.creator)
+    and (not args.assignee or task["assigned_to_name"] == args.assignee)
+    or regex.match(task["text"])
 ]
 
-write_csv(f"output/all_tasks.csv-{args.environment}", task_fields, tasks)
-write_csv(f"output/deleted_tasks-{args.environment}.csv", task_fields, filtered_tasks)
+write_csv(f"output/all_tasks-{args.env}.csv", task_fields, tasks)
+write_csv(f"output/deleted_tasks-{args.env}.csv", task_fields, filtered_tasks)
 
 ans = input(f"Delete {len(filtered_tasks)} of {len(tasks)} incomplete tasks? (y/n): ")
 if ans.lower() != "y":
