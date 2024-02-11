@@ -93,3 +93,5 @@ ENV/
 
 # PyCharm (Jet Brains) project settings
 .idea
+output
+input
