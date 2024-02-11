@@ -1,4 +1,5 @@
 import argparse
+import sys
 from CloseApiWrapper import CloseApiWrapper
 from ZendeskApiWrapper import ZendeskApiWrapper
 from utils.csv import write_csv
@@ -9,7 +10,7 @@ arg_parser = argparse.ArgumentParser(
     description="Copy Healthie user IDs from Zendesk to Close"
 )
 arg_parser.add_argument(
-    "--environment",
+    "--env",
     "-e",
     required=True,
     choices=["dev", "prod"],
@@ -27,7 +28,7 @@ def create_email_healthie_user_id_mapping(contacts):
 
 
 # Fetch Healthie user IDs stored in Zendesk contacts
-zendesk_access_token = get_api_key("api.getbase.com", args.environment)
+zendesk_access_token = get_api_key("api.getbase.com", args.env)
 zendesk = ZendeskApiWrapper(access_token=zendesk_access_token)
 
 zendesk_contacts = zendesk.get_all_items("contacts")
@@ -36,13 +37,16 @@ email_to_healthie_user_id = create_email_healthie_user_id_mapping(zendesk_contac
 print(f"{len(email_to_healthie_user_id)} email to Healthie user ID mappings")
 
 # Fetch Close Leads that lack Healthie User IDs
-close_api_key = get_api_key("api.close.com", f"admin_{args.environment}")
+close_api_key = get_api_key("api.close.com", f"admin_{args.env}")
 close = CloseApiWrapper(close_api_key)
 
-if args.environment == "dev":
+if args.env == "dev":
     healthie_user_id_field_id = "custom.cf_4rzCyZ6WLz7M4seash24mlx1TXM4JGvh785NqkngAl9"
-else:
+elif args.env == "prod":
     healthie_user_id_field_id = "custom.cf_8ziVuLyvS1SE5dkH2QS6h919rMvs1uRDepx5ORwRd12"
+else:
+    print("Unsupported environment")
+    sys.exit(0)
 
 close_leads = close.get_all_items(
     "lead",
@@ -104,12 +108,12 @@ print(f"{leads_without_primary_email_count} leads do not have primary email.")
 
 common_headers = ["lead_id", "lead_name", "primary_email"]
 write_csv(
-    f"output/leads_updated_with_healthie_user_id-{args.environment}.csv",
+    f"output/leads_updated_with_healthie_user_id-{args.env}.csv",
     common_headers + ["healthie_user_id"],
     updated_leads,
 )
 write_csv(
-    f"output/leads_without_healthie_user_id-{args.environment}.csv",
+    f"output/leads_without_healthie_user_id-{args.env}.csv",
     common_headers,
     leads_without_healthie_user_id,
 )
