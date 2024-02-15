@@ -63,6 +63,15 @@ class CloseApiWrapper(Client):
             )["members"]
         }
 
+    def get_custom_field_id(self, object_type: str, name: str) -> str | None:
+        custom_fields = self.get(
+            f"custom_field/{object_type}", params={"_fields": "id,name"}
+        )["data"]
+        return next(
+            (cf["id"] for cf in custom_fields if cf["name"].lower() == name.lower()),
+            None,
+        )
+
     def get_all_items(self, url, params=None):
         if params is None:
             params = {}
