@@ -1,4 +1,7 @@
+import asyncio
 from datetime import datetime
+from typing import cast
+from aiohttp import ClientSession
 from basecrm import Client
 
 
@@ -10,6 +13,11 @@ class ZendeskApiWrapper(Client):
 
     def __init__(self, **options):
         super().__init__(**options)
+        self.headers = {
+            "Authorization": f"Bearer {self.config.access_token}",
+            "Content-Type": "application/json",
+        }
+        self.records_per_page = 200
 
     def get_user_ids_by_email(self) -> dict[str, str]:
         users = self.users.list()
@@ -91,3 +99,110 @@ class ZendeskApiWrapper(Client):
             page += 1
 
         return items
+
+    async def get_custom_field_search_api_id(
+        self, resource_type: str, name: str
+    ) -> str | None:
+        url = f"https://api.getbase.com/v3/{resource_type}/custom_fields"
+
+        async with ClientSession(headers=self.headers) as session:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise Exception(f"API call failed: {await response.text()}")
+                data = await response.json()
+                custom_field_id = next(
+                    (
+                        cast(str, item["data"]["search_api_id"])
+                        for item in data["items"]
+                        if item["data"]["name"] == name
+                    ),
+                    None,
+                )
+                return custom_field_id
+
+    async def get_contact_custom_field_search_api_id(self, name: str):
+        return await self.get_custom_field_search_api_id("contacts", name)
+
+    async def search(
+        self,
+        session: ClientSession,
+        resource_type: str,
+        query,
+        hits: bool = None,
+        page: int = None,
+    ) -> dict:
+        """
+        Makes an asynchronous search API call to Zendesk Sell.
+
+        Args:
+        session (ClientSession): The aiohttp ClientSession object.
+        resource_type (str): The type of resource to search. If None, searches all types.
+        query (Any): The search query.
+        hits (bool, optional): Whether to include hits in the response. Defaults to True.
+        page (int, optional): The page number of the search results. Defaults to 0.
+
+        Returns:
+        dict: The JSON response from the API.
+        """
+        url = f"https://api.getbase.com/v3/{resource_type}/search"
+
+        # Prepare payload
+        if hits is None:
+            hits = True
+
+        if page is None:
+            page = 0
+
+        payload = {
+            "items": [
+                {
+                    "data": {
+                        "query": query,
+                        "hits": hits,
+                        "page": page,
+                        "per_page": self.records_per_page,
+                    }
+                }
+            ]
+        }
+
+        # Make the API call
+        async with session.post(url, json=payload) as response:
+            if response.status != 200:
+                raise Exception(f"API call failed: {await response.text()}")
+            return await response.json()
+
+    async def count_contacts(self, session: ClientSession, query) -> int:
+        result = await self.search(session, "contacts", query, hits=False)
+        total_count = result["items"][0]["meta"]["total_count"]
+        return total_count
+
+    async def filter_contacts(self, attribute_names, filter_query):
+        projection = [{"name": name} for name in attribute_names]
+        query = {
+            "projection": projection,
+            "filter": {"and": [{"filter": filter_query}]},
+        }
+        async with ClientSession(headers=self.headers) as session:
+            total_count = await self.count_contacts(session, query)
+            page_count = (
+                total_count + self.records_per_page - 1
+            ) // self.records_per_page
+
+            # Create a list of tasks for each page to be fetched
+            tasks = [
+                self.search(session, "contacts", query, page=page)
+                for page in range(0, page_count)
+            ]
+
+            # Gather all tasks and wait for them to complete
+            results = await asyncio.gather(*tasks)
+
+            # Combine results from all pages
+            combined_results = [
+                item["data"]
+                for result in results
+                for item in result["items"][0]["items"]
+            ]
+
+            return combined_results

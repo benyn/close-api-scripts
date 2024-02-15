@@ -152,40 +152,54 @@ class CloseApiWrapper(Client):
         resp = self.post("data/search", data=payload)
         return cast(int, resp["count"]["total"])
 
-    def create_email_query(
+    def create_contact_email_query(
+        self, email: str
+    ) -> dict[str, str | dict[str, str | dict[str, str]]]:
+        return {
+            "type": "has_related",
+            "this_object_type": "contact",
+            "related_object_type": "contact_email",
+            "related_query": {
+                "type": "field_condition",
+                "field": {
+                    "type": "regular_field",
+                    "object_type": "contact_email",
+                    "field_name": "email",
+                },
+                "condition": {
+                    "type": "text",
+                    "mode": "exact_value",
+                    "value": email,
+                },
+            },
+        }
+
+    def create_lead_email_query(
         self, email: str
     ) -> dict[str, str | dict[str, str | dict[str, str | dict[str, str]]]]:
         return {
             "type": "has_related",
             "this_object_type": "lead",
             "related_object_type": "contact",
-            "related_query": {
-                "type": "has_related",
-                "this_object_type": "contact",
-                "related_object_type": "contact_email",
-                "related_query": {
-                    "type": "field_condition",
-                    "field": {
-                        "type": "regular_field",
-                        "object_type": "contact_email",
-                        "field_name": "email",
-                    },
-                    "condition": {
-                        "type": "text",
-                        "mode": "exact_value",
-                        "value": email,
-                    },
-                },
-            },
+            "related_query": self.create_contact_email_query(email),
         }
 
     def search_leads_by_email(
         self, email: str, results_limit: int | None = None
     ) -> list[dict[str, Any]]:
         return self.search(
-            self.create_email_query(email),
+            self.create_lead_email_query(email),
             results_limit=results_limit,
         )
 
+    def find_contact_by_email(self, email: str):
+        contacts = self.search(
+            self.create_contact_email_query(email),
+            fields=["id", "emails"],
+            results_limit=1,
+            object_type="contact",
+        )
+        return contacts[0] if contacts else None
+
     def email_exists(self, email: str) -> bool:
-        return self.count(self.create_email_query(email)) > 0
+        return self.count(self.create_lead_email_query(email)) > 0
