@@ -68,6 +68,7 @@ class ZendeskApiWrapper(Client):
             "deals": self.deals.list,
             "notes": self.notes.list,
             "tasks": self.tasks.list,
+            "orders": self.orders.list,
         }
 
         if object_type not in method_mapping:
@@ -206,3 +207,17 @@ class ZendeskApiWrapper(Client):
             ]
 
             return combined_results
+
+    async def get_contact(self, id: int):
+        return await asyncio.to_thread(self.contacts.retrieve, id)
+
+    async def get_deal(self, id: int):
+        return await asyncio.to_thread(self.deals.retrieve, id)
+
+    async def get_deal_and_associated_primary_contact(self, id: int):
+        deal = await self.get_deal(id)
+        contact = await self.get_contact(deal.contact_id) if deal.contact_id else None
+        return (deal, contact)
+
+    async def get_line_items(self, order_id: int):
+        return await asyncio.to_thread(self.line_items.list, order_id)

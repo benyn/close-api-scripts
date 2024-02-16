@@ -169,7 +169,7 @@ class CloseApiWrapper(Client):
                 "condition": {
                     "type": "text",
                     "mode": "exact_value",
-                    "value": email,
+                    "value": email.lower(),
                 },
             },
         }
@@ -192,6 +192,15 @@ class CloseApiWrapper(Client):
             results_limit=results_limit,
         )
 
+    async def find_lead_by_email(
+        self, email: str, fields: list[str] | None = None
+    ) -> dict[str, Any] | None:
+        query = self.create_lead_email_query(email)
+        leads = await asyncio.to_thread(
+            self.search, query, results_limit=1, fields=fields
+        )
+        return leads[0] if leads else None
+
     def find_contact_by_email(self, email: str):
         contacts = self.search(
             self.create_contact_email_query(email),
@@ -203,3 +212,6 @@ class CloseApiWrapper(Client):
 
     def email_exists(self, email: str) -> bool:
         return self.count(self.create_lead_email_query(email)) > 0
+
+    async def update_opportunity(self, id: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(self.put, f"opportunity/{id}", data=data)
