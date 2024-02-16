@@ -56,7 +56,6 @@ class ZendeskApiWrapper(Client):
         """
         Fetch objects (leads, contacts, deals, notes, tasks) updated after a certain date from Zendesk Sell.
 
-        :param api_token: Your Zendesk Sell API token.
         :param object_type: Type of the object to fetch (e.g., 'leads', 'contacts', 'deals', 'notes', 'tasks').
         :param since_date: The date to fetch objects from (YYYY-MM-DD format). Optional.
         :return: A list of objects.
@@ -78,8 +77,9 @@ class ZendeskApiWrapper(Client):
         items = []
         page = 1
         while True:
+            # The default limit is 25 and maximum number that can be returned is 100.
             fetched_items = method_mapping[object_type](
-                page=page, per_page=50, sort_by="updated_at:desc"
+                page=page, per_page=100, sort_by="updated_at:desc"
             )
             if not fetched_items:
                 break
