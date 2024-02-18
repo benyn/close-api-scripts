@@ -1,13 +1,7 @@
 import argparse
 import csv
 
-
-def read_csv(file_path):
-    """Reads a CSV file and returns a list of rows."""
-    with open(file_path, mode="r", encoding="utf-8") as file:
-        reader = csv.reader(file)
-        # return list(reader)
-        return [tuple(row) for row in reader]
+from utils.csv import read_csv
 
 
 def diff_csv(source_file, comparison_file, output_file):
