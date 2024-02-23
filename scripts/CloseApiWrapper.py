@@ -1,5 +1,6 @@
+import asyncio
 from typing import Any, cast
-from closeio_api import Client
+from closeio_api import APIError, Client, ValidationError
 
 
 class CloseApiWrapper(Client):
@@ -47,6 +48,36 @@ class CloseApiWrapper(Client):
             opportunity_statuses.extend(pipeline['statuses'])
 
         return opportunity_statuses
+
+    def get_lead_and_contact_ids_by_phone(self):
+        contacts = self.get_all("contact", params={"_fields": "id,phones"})
+        return {
+            phone["phone"]: (contact["lead_id"], contact["id"])
+            for contact in contacts
+            for phone in contact["phones"]
+        }
+
+    def get_user(self, user_identifier):
+        if user_identifier.startswith("user_"):
+            try:
+                return self.get(f"user/{user_identifier}")
+            except APIError as e:
+                print(f"Failed to fetch user with {user_identifier} because {e}")
+                return None
+
+        users = self.get_all("user")
+        if "@" in user_identifier:
+            return next(iter(u for u in users if u["email"] == user_identifier), None)
+        else:
+            return next(
+                iter(
+                    u
+                    for u in users
+                    if user_identifier.startswith(u["first_name"])
+                    and user_identifier.endswith(u["last_name"])
+                ),
+                None,
+            )
 
     def get_user_ids_by_email(self):
         users = self.get("user", params={"_fields": "id,email"})
@@ -215,3 +246,94 @@ class CloseApiWrapper(Client):
 
     async def update_opportunity(self, id: str, data: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(self.put, f"opportunity/{id}", data=data)
+
+    async def _dispatch_async(self, method_name: str, endpoint: str, data=None):
+        return await asyncio.to_thread(self._dispatch, method_name, endpoint, data=data)
+
+    async def _dispatch_slice(
+        self,
+        method_name: str,
+        endpoint_and_data_slice: list[tuple[str, dict[str, Any]]],
+    ) -> list[Any]:
+        tasks = [
+            self._dispatch_async(method_name, endpoint, data=data)
+            for endpoint, data in endpoint_and_data_slice
+        ]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _dispatch_all(
+        self,
+        method_name: str,
+        endpoint_and_data_list: list[tuple[str, dict[str, Any]]],
+        slice_size: int,
+        verbose: bool,
+    ) -> tuple[list[Any], list[Any]]:
+        successful_items = []
+        failed_items = []
+        for i in range(0, len(endpoint_and_data_list), slice_size):
+            slice = endpoint_and_data_list[i : i + slice_size]
+            if verbose:
+                print(f"Processing items {i} through {i + len(slice) - 1}...")
+
+            results = await self._dispatch_slice(method_name, slice)
+
+            for idx, result in enumerate(results):
+                if not isinstance(result, Exception):
+                    successful_items.append(result)
+                elif isinstance(result, ValidationError):
+                    failed_items.append(
+                        {
+                            "error_type": "validation_error",
+                            "errors": result.errors,
+                            "field_errors": result.field_errors,
+                            "data": slice[idx],
+                        }
+                    )
+                else:
+                    print(f"Task {idx} raised an exception: {result}")
+                    failed_items.append(result)
+
+        return successful_items, failed_items
+
+    async def post_async(self, endpoint: str, data: dict["str", Any]):
+        return await asyncio.to_thread(self.post, endpoint, data)
+
+    async def put_async(self, endpoint: str, data: dict["str", Any]):
+        return await asyncio.to_thread(self.put, endpoint, data)
+
+    async def delete_async(self, endpoint: str):
+        return await asyncio.to_thread(self.delete, endpoint)
+
+    async def post_all(
+        self,
+        endpoint_and_data_list: list[tuple[str, dict[str, Any]]],
+        slice_size: int = 5,
+        verbose: bool = False,
+    ) -> tuple[list[Any], list[Any]]:
+        return await self._dispatch_all(
+            "post",
+            endpoint_and_data_list,
+            slice_size,
+            verbose,
+        )
+
+    async def put_all(
+        self,
+        endpoint_and_data_list: list[tuple[str, dict[str, Any]]],
+        slice_size: int = 5,
+        verbose: bool = False,
+    ) -> tuple[list[Any], list[Any]]:
+        return await self._dispatch_all(
+            "put",
+            endpoint_and_data_list,
+            slice_size,
+            verbose,
+        )
+
+    async def delete_all(
+        self, endpoints: list[str], slice_size: int = 5, verbose: bool = False
+    ) -> tuple[list[Any], list[Any]]:
+        endpoint_and_data_list = [(endpoint, None) for endpoint in endpoints]
+        return await self._dispatch_all(
+            "delete", endpoint_and_data_list, slice_size, verbose
+        )
