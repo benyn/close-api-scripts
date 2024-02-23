@@ -113,7 +113,7 @@ class CloseApiWrapper(Client):
         while has_more:
             params["_skip"] = offset
             resp = self.get(url, params=params)
-            items.extend(resp['data'])
+            items.extend(resp["data"])
             offset += len(resp["data"])
             has_more = resp["has_more"]
 
