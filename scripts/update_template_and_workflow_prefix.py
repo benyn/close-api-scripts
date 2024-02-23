@@ -25,7 +25,7 @@ new_prefix = f"{args.to_prefix}:"
 
 
 def update_item_prefix(item_type):
-    items = api.get_all_items(item_type, params={"_fields": "id,name"})
+    items = api.get_all(item_type, params={"_fields": "id,name"})
     for item in items:
         old_name = item["name"]
         if old_name.startswith(old_prefix):

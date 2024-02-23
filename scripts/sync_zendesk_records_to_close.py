@@ -354,7 +354,7 @@ def sync_data(zendesk_resource_type, close_object_type):
     if args.verbose:
         print(f"Syncing Zendesk {zendesk_resource_type} as Close {close_object_type}s")
 
-    zendesk_data = zendesk.get_all_items(zendesk_resource_type, last_lead_creation_date)
+    zendesk_data = zendesk.get_all(zendesk_resource_type, last_lead_creation_date)
     if not zendesk_data:
         print(f"No new {zendesk_resource_type} since {last_lead_creation_date}")
         return

@@ -62,7 +62,7 @@ loss_reason_field_id = api.get_custom_field_id("opportunity", "Loss Reason")
 loss_reason_field_id_with_prefix = f"custom.{loss_reason_field_id}"
 
 
-opportunities = api.get_all_items(
+opportunities = api.get_all(
     "opportunity",
     params={
         "status_id": source_status_id,

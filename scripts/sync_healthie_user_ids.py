@@ -31,7 +31,7 @@ def create_email_healthie_user_id_mapping(contacts):
 zendesk_access_token = get_api_key("api.getbase.com", args.env)
 zendesk = ZendeskApiWrapper(access_token=zendesk_access_token)
 
-zendesk_contacts = zendesk.get_all_items("contacts")
+zendesk_contacts = zendesk.get_all("contacts")
 print(f"{len(zendesk_contacts)} Zendesk contacts")
 email_to_healthie_user_id = create_email_healthie_user_id_mapping(zendesk_contacts)
 print(f"{len(email_to_healthie_user_id)} email to Healthie user ID mappings")
@@ -48,7 +48,7 @@ else:
     print("Unsupported environment")
     sys.exit(1)
 
-close_leads = close.get_all_items(
+close_leads = close.get_all(
     "lead",
     params={
         "_fields": f"id,name,contacts,{healthie_user_id_field_id}",

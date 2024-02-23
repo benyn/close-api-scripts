@@ -52,7 +52,7 @@ class ZendeskApiWrapper(Client):
         else:
             raise ValueError("Invalid resource type")
 
-    def get_all_items(self, object_type: str, since_date: datetime | None = None):
+    def get_all(self, object_type: str, since_date: datetime | None = None):
         """
         Fetch objects (leads, contacts, deals, notes, tasks) updated after a certain date from Zendesk Sell.
 

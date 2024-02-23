@@ -79,7 +79,7 @@ api = CloseApiWrapper(api_key)
 # total_slices = int(math.ceil(float(total_contacts) / 1000))
 # slices = range(1, total_slices + 1)
 # contacts = []
-contacts = api.get_all_items(
+contacts = api.get_all(
     "contact", params={"_fields": "lead_id,id,name,emails,phones,urls,date_created"}
 )
 contacts.sort(key=itemgetter("date_created"))

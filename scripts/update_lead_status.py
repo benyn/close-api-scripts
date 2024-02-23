@@ -57,7 +57,7 @@ if lead_status_id is None:
 if args.verbose:
     print("Fetching opportunities...")
 
-opportunities = api.get_all_items(
+opportunities = api.get_all(
     "opportunity",
     params={
         "query": f"{loss_reason_field_id_with_prefix}:{args.loss_reason}",

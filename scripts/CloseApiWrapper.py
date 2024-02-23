@@ -72,7 +72,7 @@ class CloseApiWrapper(Client):
             None,
         )
 
-    def get_all_items(self, url, params=None):
+    def get_all(self, url, params=None):
         if params is None:
             params = {}
 

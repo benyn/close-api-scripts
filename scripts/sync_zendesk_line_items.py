@@ -128,7 +128,7 @@ async def sync_order_group(orders):
 
 
 async def main():
-    orders = zendesk.get_all_items("orders")
+    orders = zendesk.get_all("orders")
     if args.verbose:
         logging.info(f"Syncing {len(orders)} orders from Zendesk to Close...")
 

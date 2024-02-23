@@ -60,7 +60,7 @@ opportunity_fields = [
 ]
 fields_param = ",".join(opportunity_fields)
 
-opportunities = api.get_all_items(
+opportunities = api.get_all(
     "opportunity",
     params={
         "status_id": status_id,

@@ -50,7 +50,7 @@ task_fields = [
 ]
 fields_param = ",".join(task_fields)
 
-tasks = api.get_all_items(
+tasks = api.get_all(
     "task",
     params={"is_complete": False, "_order_by": "date_created", "_fields": fields_param},
 )

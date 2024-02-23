@@ -40,7 +40,7 @@ lead_sources = close.get(f"custom_field/lead/{lead_source_field_id}")["choices"]
 
 
 # Fetch and iterate through opportunities
-opportunities = close.get_all_items(
+opportunities = close.get_all(
     "opportunity",
     params={"_fields": "id,note,lead_name,lead_id"},
 )
