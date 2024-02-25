@@ -94,6 +94,15 @@ class CloseApiWrapper(Client):
             )["members"]
         }
 
+    def get_custom_activity_type_id(self, name: str) -> str | None:
+        custom_activity_types = self.get_all(
+            "custom_activity", params={"_fields": "id,name"}
+        )
+        for cat in custom_activity_types:
+            if cat["name"].lower() == name.lower():
+                return cat["id"]
+        return None
+
     def get_custom_field_id(self, object_type: str, name: str) -> str | None:
         custom_fields = self.get(
             f"custom_field/{object_type}", params={"_fields": "id,name"}
@@ -102,6 +111,11 @@ class CloseApiWrapper(Client):
             (cf["id"] for cf in custom_fields if cf["name"].lower() == name.lower()),
             None,
         )
+
+    def get_custom_field_id_name_mapping(self, object_type: str) -> dict[str, str]:
+        schema = self.get(f"custom_field_schema/{object_type}")
+        mapping = {field["id"]: field["name"] for field in schema["fields"]}
+        return mapping
 
     def get_all(self, url, params=None):
         if params is None:
@@ -115,7 +129,7 @@ class CloseApiWrapper(Client):
             resp = self.get(url, params=params)
             items.extend(resp["data"])
             offset += len(resp["data"])
-            has_more = resp["has_more"]
+            has_more = resp.get("has_more")
 
         return items
 
@@ -215,6 +229,31 @@ class CloseApiWrapper(Client):
             "related_query": self.create_contact_email_query(email),
         }
 
+    def create_has_related_custom_activity_query(self, custom_activity_type_id: str):
+        return {
+            "type": "has_related",
+            "this_object_type": "lead",
+            "related_object_type": "activity.custom_activity",
+            "related_query": {
+                "type": "and",
+                "queries": [
+                    {
+                        "type": "field_condition",
+                        "field": {
+                            "type": "regular_field",
+                            "object_type": "activity.custom_activity",
+                            "field_name": "custom_activity_type_id",
+                        },
+                        "condition": {
+                            "type": "term",
+                            "values": [custom_activity_type_id],
+                        },
+                    },
+                    {"type": "match_all"},
+                ],
+            },
+        }
+
     def search_leads_by_email(
         self, email: str, results_limit: int | None = None
     ) -> list[dict[str, Any]]:
@@ -295,10 +334,10 @@ class CloseApiWrapper(Client):
 
         return successful_items, failed_items
 
-    async def post_async(self, endpoint: str, data: dict["str", Any]):
+    async def post_async(self, endpoint: str, data: dict[str, Any]):
         return await asyncio.to_thread(self.post, endpoint, data)
 
-    async def put_async(self, endpoint: str, data: dict["str", Any]):
+    async def put_async(self, endpoint: str, data: dict[str, Any]):
         return await asyncio.to_thread(self.put, endpoint, data)
 
     async def delete_async(self, endpoint: str):
@@ -337,3 +376,73 @@ class CloseApiWrapper(Client):
         return await self._dispatch_all(
             "delete", endpoint_and_data_list, slice_size, verbose
         )
+
+    async def get_all_async(
+        self, endpoint: str, params: dict[str, str] = None
+    ) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.get_all, endpoint, params)
+
+    async def get_all_slice(
+        self,
+        endpoint_and_params_slice: list[tuple[str, dict[str, Any]]],
+    ) -> list[Any]:
+        tasks = [
+            self.get_all_async(endpoint, params=params)
+            for endpoint, params in endpoint_and_params_slice
+        ]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def get_all_concurrently(
+        self,
+        endpoint_and_params_list: list[tuple[str, dict[str, Any]]],
+        slice_size: int = 10,
+        verbose: bool = False,
+    ) -> tuple[list[Any], list[Any]]:
+        items = []
+        errors = []
+        for i in range(0, len(endpoint_and_params_list), slice_size):
+            slice = endpoint_and_params_list[i : i + slice_size]
+            if verbose:
+                print(f"Getting items {i} through {i + len(slice) - 1}...")
+
+            results = await self.get_all_slice(slice)
+
+            for idx, result in enumerate(results):
+                if not isinstance(result, Exception):
+                    items.extend(result)
+                else:
+                    print(f"Task {idx} raised an exception: {result}")
+                    errors.append(result)
+
+        return items, errors
+
+    async def get_custom_activity_instances(
+        self,
+        custom_activity_type_id: str,
+        date_created_start: str = None,
+        date_created_end: str = None,
+    ):
+        query = self.create_has_related_custom_activity_query(custom_activity_type_id)
+        leads = self.search(query)
+        print(f"{len(leads)} leads")
+        endpoint_and_params_list = [
+            (
+                "activity/custom",
+                {
+                    "lead_id": lead["id"],
+                    "custom_activity_type_id": custom_activity_type_id,
+                    "date_created__gt": date_created_start,
+                    "date_created__lt": date_created_end,
+                },
+            )
+            for lead in leads
+        ]
+        custom_activity_instances, errors = await self.get_all_concurrently(
+            endpoint_and_params_list, verbose=True
+        )
+        print(f"{len(custom_activity_instances)} custom activity instances")
+        if errors:
+            print(f"{len(errors)} errors")
+
+        custom_activity_instances.sort(key=lambda x: x["date_created"])
+        return custom_activity_instances
