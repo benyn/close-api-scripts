@@ -113,6 +113,10 @@ async def main():
     else:
         max_unix_time = bigquery.get_max_unix_time(args.table_name)
         start_date = unix_time_to_date(max_unix_time) if max_unix_time else None
+        if args.verbose:
+            logging.info(
+                f"Getting CallTrackingMetrics activities since {start_date}..."
+            )
         fetched_activities = await get_ctm_activities(start_date)
         if not fetched_activities:
             logging.info(f"No new calls since {start_date}")
