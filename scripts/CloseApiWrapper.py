@@ -79,6 +79,20 @@ class CloseApiWrapper(Client):
                 None,
             )
 
+    def get_id_name_mapping(
+        self, endpoint: str, name_field_name: str = None
+    ) -> dict[str, str]:
+        name_field_name = name_field_name or "name"
+        items = self.get(endpoint, params={"_fields": f"id,{name_field_name}"})["data"]
+        return {item["id"]: item[name_field_name] for item in items}
+
+    def get_name_id_mapping(
+        self, endpoint: str, name_field_name: str = None
+    ) -> dict[str, str]:
+        name_field_name = name_field_name or "name"
+        items = self.get(endpoint, params={"_fields": f"id,{name_field_name}"})["data"]
+        return {item[name_field_name]: item["id"] for item in items}
+
     def get_user_ids_by_email(self):
         users = self.get("user", params={"_fields": "id,email"})
         return {user["email"]: user["id"] for user in users["data"]}
