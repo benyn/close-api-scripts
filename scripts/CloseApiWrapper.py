@@ -126,9 +126,20 @@ class CloseApiWrapper(Client):
             None,
         )
 
+    def get_prefixed_custom_field_id(self, object_type: str, name: str) -> str | None:
+        custom_field_id = self.get_custom_field_id(object_type, name)
+        return f"custom.{custom_field_id}" if custom_field_id else None
+
     def get_custom_field_id_name_mapping(self, object_type: str) -> dict[str, str]:
         schema = self.get(f"custom_field_schema/{object_type}")
         mapping = {field["id"]: field["name"] for field in schema["fields"]}
+        return mapping
+
+    def get_custom_field_name_prefixed_id_mapping(
+        self, object_type: str
+    ) -> dict[str, str]:
+        schema = self.get(f"custom_field_schema/{object_type}")
+        mapping = {field["name"]: f"custom.{field['id']}" for field in schema["fields"]}
         return mapping
 
     def get_all(self, url, params=None):
@@ -460,3 +471,37 @@ class CloseApiWrapper(Client):
 
         custom_activity_instances.sort(key=lambda x: x["date_created"])
         return custom_activity_instances
+
+    def get_last_lead_qualification(self, lead_id: str, verbose: bool) -> dict | None:
+        lead_qualification_custom_activity_type_id = self.get_custom_activity_type_id(
+            "Lead Qualification"
+        )
+        lead_qualifications = self.get_all(
+            "activity/custom",
+            params={
+                "lead_id": lead_id,
+                "custom_activity_type_id": lead_qualification_custom_activity_type_id,
+            },
+        )
+
+        if not lead_qualifications:
+            return None
+
+        if verbose:
+            print(
+                f"{len(lead_qualifications)} Lead Qualification custom activit{'y' if len(lead_qualifications) == 1 else 'ies'}"
+            )
+
+        sorted_lead_qualifications = sorted(
+            lead_qualifications, key=lambda x: x["date_created"], reverse=True
+        )
+        return sorted_lead_qualifications[0]
+
+    def get_workflow_id(self, prefix: str, suffix: str) -> str | None:
+        workflows = self.get_all("sequence", params={"_fields": "id,name"})
+        for workflow in workflows:
+            if workflow["name"].startswith(prefix) and workflow["name"].endswith(
+                suffix
+            ):
+                return workflow["id"]
+        return None
