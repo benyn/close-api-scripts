@@ -40,6 +40,10 @@ parser.add_argument(
     ],
     help="Activity type",
 )
+parser.add_argument("--status", "-s", help="Opportunity status")
+parser.add_argument(
+    "--opportunity-only", "-o", action="store_true", help="Create opportunity only"
+)
 parser.add_argument("--verbose", "-v", action="store_true", help="verbose logging")
 args = parser.parse_args()
 
@@ -98,6 +102,9 @@ def get_opportunity_payload(activity, source_custom_activity_instance_id):
         key: value for key, value in activity.items() if key in copied_default_field_ids
     }
 
+    if args.status:
+        payload["status"] = args.status
+
     opp_custom_field_ids = api.get_custom_field_name_prefixed_id_mapping("opportunity")
     source_custom_activity_instance_id_field_id = opp_custom_field_ids[
         "source_custom_activity_instance_id"
@@ -126,6 +133,10 @@ def create_opportunity(activity, source_custom_activity_instance_id):
 lead_id, activity_id = get_lead_and_activity_id(args.activity_url)
 activity_type = args.activity_type if args.activity_type else "note"
 activity = api.get(f"activity/{activity_type}/{activity_id}")
-created_lead_qualification = create_lead_qualification(activity)
-created_opportunity = create_opportunity(activity, created_lead_qualification["id"])
+if args.opportunity_only:
+    created_opportunity = create_opportunity(activity, None)
+else:
+    created_lead_qualification = create_lead_qualification(activity)
+    created_opportunity = create_opportunity(activity, created_lead_qualification["id"])
+
 print(f"Created {created_opportunity['id']}")

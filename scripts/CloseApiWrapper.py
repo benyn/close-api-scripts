@@ -441,14 +441,15 @@ class CloseApiWrapper(Client):
 
         return items, errors
 
-    async def get_custom_activity_instances(
+    async def get_leads_with_custom_activity_instances(
         self,
         custom_activity_type_id: str,
+        fields: list[str] = None,
         date_created_start: str = None,
         date_created_end: str = None,
     ):
         query = self.create_has_related_custom_activity_query(custom_activity_type_id)
-        leads = self.search(query)
+        leads = self.search(query, fields=fields)
         print(f"{len(leads)} leads")
         endpoint_and_params_list = [
             (
@@ -469,8 +470,49 @@ class CloseApiWrapper(Client):
         if errors:
             print(f"{len(errors)} errors")
 
+        return leads, custom_activity_instances
+
+    async def get_custom_activity_instances(
+        self,
+        custom_activity_type_id: str,
+        date_created_start: str = None,
+        date_created_end: str = None,
+    ):
+        (
+            leads,
+            custom_activity_instances,
+        ) = await self.get_leads_with_custom_activity_instances(
+            custom_activity_type_id,
+            date_created_start=date_created_start,
+            date_created_end=date_created_end,
+        )
         custom_activity_instances.sort(key=lambda x: x["date_created"])
         return custom_activity_instances
+
+    async def get_leads_with_custom_activity_instances_and_opportunities(
+        self, custom_activity_type_id: str
+    ):
+        (
+            leads,
+            custom_activity_instances,
+        ) = await self.get_leads_with_custom_activity_instances(
+            custom_activity_type_id, fields=["id", "opportunities"]
+        )
+
+        # Create a mapping of lead_id to lead object
+        lead_mapping = {lead["id"]: lead for lead in leads}
+
+        # Allocate custom_activity_instances to each lead
+        for instance in custom_activity_instances:
+            lead_id = instance["lead_id"]
+            if lead_id in lead_mapping:
+                if "custom_activity_instances" not in lead_mapping[lead_id]:
+                    lead_mapping[lead_id]["custom_activity_instances"] = []
+                lead_mapping[lead_id]["custom_activity_instances"].append(instance)
+
+        # Convert the mapping back to a list of leads
+        leads_with_activities = list(lead_mapping.values())
+        return leads_with_activities
 
     def get_last_lead_qualification(self, lead_id: str, verbose: bool) -> dict | None:
         lead_qualification_custom_activity_type_id = self.get_custom_activity_type_id(
