@@ -23,7 +23,7 @@
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
   "reportArgumentType": false,
-  "pythonVersion": "3.11",
+  "pythonVersion": "3.12",
   "pythonPlatform": "Darwin",
   "executionEnvironments": [
     {
