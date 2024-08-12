@@ -1,5 +1,5 @@
 import csv
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 
 def read_csv(file_path, exclude_header=False):
@@ -18,7 +18,7 @@ def read_csv_to_dict(file_path: str) -> list[dict[str, Any]]:
         return list(reader)
 
 
-def write_csv(file_name: str, keys: list[str], rows: dict[str, Any]):
+def write_csv(file_name: str, keys: list[str], rows: Iterable[Mapping[str, Any]]):
     with open(file_name, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, keys)
         writer.writeheader()
