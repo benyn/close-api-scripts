@@ -167,7 +167,7 @@ class CloseApiWrapper(Client):
         sort: list[dict[str, str | dict[str, str]]] | None = None,
         results_limit: int | None = None,
         fields: list[str] | None = None,
-        limit: int | None = None,
+        limit: int = 200,  # Maximum 200
         object_type: str | None = None,
     ) -> list[dict[str, Any]]:
         if object_type is None:
