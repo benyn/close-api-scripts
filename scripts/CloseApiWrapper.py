@@ -109,6 +109,9 @@ class CloseApiWrapper(Client):
         }
 
     def get_custom_activity_type_id(self, name: str) -> str | None:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Invalid name. Name must be a non-empty string.")
+
         custom_activity_types = self.get_all(
             "custom_activity", params={"_fields": "id,name"}
         )

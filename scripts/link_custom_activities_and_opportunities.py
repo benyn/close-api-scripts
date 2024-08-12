@@ -23,6 +23,7 @@ parser.add_argument(
     "--custom-activity-type",
     "-t",
     help="Custom Activity type",
+    required=True
 )
 parser.add_argument("--verbose", "-v", action="store_true", help="verbose logging")
 args = parser.parse_args()
