@@ -81,13 +81,13 @@ async def fetch_appointments(appointment_type_id: int):
     # Check if the request was successful
     if response.status_code == 200:
         data = response.json()
-        if "data" in data:
+        if "errors" in data:
+            print("Errors:", data["errors"])
+
+        elif "data" in data:
             appointments = data.get("data", {}).get("appointments", [])
             print(f"Retrieved {len(appointments)} appointments.")
             return appointments
-
-        elif "errors" in data:
-            print("Errors:", data["errors"])
 
     else:
         print(f"Error: {response.status_code}")
