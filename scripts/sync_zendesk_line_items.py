@@ -6,10 +6,8 @@ import sys
 
 from basecrm.errors import RateLimitError
 from CloseApiWrapper import CloseApiWrapper
-from ZendeskApiWrapper import ZendeskApiWrapper
-
 from utils.get_api_key import get_api_key
-
+from ZendeskApiWrapper import ZendeskApiWrapper
 
 arg_parser = argparse.ArgumentParser(
     description="Copy Healthie user IDs from Zendesk to Close"
@@ -42,9 +40,9 @@ close_api_key = get_api_key("api.close.com", f"admin_{args.env}")
 close = CloseApiWrapper(close_api_key)
 
 
-services_field_id = close.get_custom_field_id("shared", args.field)
+services_field_id = close.get_custom_field_id("opportunity", args.field)
 if not services_field_id:
-    logging.error(f"Shared field '{args.field}' not found")
+    logging.error(f"Opportunity field '{args.field}' not found")
     sys.exit(1)
 
 services_field_id_with_prefix = f"custom.{services_field_id}"
