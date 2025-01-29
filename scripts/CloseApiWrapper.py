@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from typing import Any, cast
 from closeio_api import APIError, Client, ValidationError
 
@@ -223,7 +224,7 @@ class CloseApiWrapper(Client):
         resp = self.post("data/search", data=payload)
         return cast(int, resp["count"]["total"])
 
-    def create_contact_email_query(
+    def build_contact_email_query(
         self, email: str
     ) -> dict[str, str | dict[str, str | dict[str, str]]]:
         return {
@@ -245,17 +246,31 @@ class CloseApiWrapper(Client):
             },
         }
 
-    def create_lead_email_query(
+    def build_lead_email_query(
         self, email: str
     ) -> dict[str, str | dict[str, str | dict[str, str | dict[str, str]]]]:
         return {
             "type": "has_related",
             "this_object_type": "lead",
             "related_object_type": "contact",
-            "related_query": self.create_contact_email_query(email),
+            "related_query": self.build_contact_email_query(email),
         }
 
-    def create_has_related_custom_activity_query(self, custom_activity_type_id: str):
+    def build_custom_activity_type_id_query(self, custom_activity_type_id: str):
+        return {
+            "type": "field_condition",
+            "field": {
+                "type": "regular_field",
+                "object_type": "activity.custom_activity",
+                "field_name": "custom_activity_type_id",
+            },
+            "condition": {
+                "type": "term",
+                "values": [custom_activity_type_id],
+            },
+        }
+
+    def build_has_related_custom_activity_query(self, custom_activity_type_id: str):
         return {
             "type": "has_related",
             "this_object_type": "lead",
@@ -263,20 +278,38 @@ class CloseApiWrapper(Client):
             "related_query": {
                 "type": "and",
                 "queries": [
-                    {
-                        "type": "field_condition",
-                        "field": {
-                            "type": "regular_field",
-                            "object_type": "activity.custom_activity",
-                            "field_name": "custom_activity_type_id",
-                        },
-                        "condition": {
-                            "type": "term",
-                            "values": [custom_activity_type_id],
-                        },
-                    },
+                    self.build_custom_activity_type_id_query(custom_activity_type_id),
                     {"type": "match_all"},
                 ],
+            },
+        }
+
+    def build_date_range_query(
+        self,
+        object_type: str,
+        field_name: str,
+        start_date: date,
+        end_date: date,
+    ):
+        return {
+            "type": "field_condition",
+            "field": {
+                "type": "regular_field",
+                "object_type": object_type,
+                "field_name": field_name,
+            },
+            "condition": {
+                "type": "moment_range",
+                "on_or_after": {
+                    "type": "fixed_local_date",
+                    "which": "start",
+                    "value": start_date.isoformat(),
+                },
+                "before": {
+                    "type": "fixed_local_date",
+                    "which": "end",
+                    "value": end_date.isoformat(),
+                },
             },
         }
 
@@ -284,14 +317,14 @@ class CloseApiWrapper(Client):
         self, email: str, results_limit: int | None = None
     ) -> list[dict[str, Any]]:
         return self.search(
-            self.create_lead_email_query(email),
+            self.build_lead_email_query(email),
             results_limit=results_limit,
         )
 
     async def find_lead_by_email(
         self, email: str, fields: list[str] | None = None
     ) -> dict[str, Any] | None:
-        query = self.create_lead_email_query(email)
+        query = self.build_lead_email_query(email)
         leads = await asyncio.to_thread(
             self.search, query, results_limit=1, fields=fields
         )
@@ -299,7 +332,7 @@ class CloseApiWrapper(Client):
 
     def find_contact_by_email(self, email: str):
         contacts = self.search(
-            self.create_contact_email_query(email),
+            self.build_contact_email_query(email),
             fields=["id", "emails"],
             results_limit=1,
             object_type="contact",
@@ -307,7 +340,7 @@ class CloseApiWrapper(Client):
         return contacts[0] if contacts else None
 
     def email_exists(self, email: str) -> bool:
-        return self.count(self.create_lead_email_query(email)) > 0
+        return self.count(self.build_lead_email_query(email)) > 0
 
     async def update_opportunity(self, id: str, data: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(self.put, f"opportunity/{id}", data=data)
@@ -442,78 +475,171 @@ class CloseApiWrapper(Client):
 
         return items, errors
 
-    async def get_leads_with_custom_activity_instances(
-        self,
-        custom_activity_type_id: str,
-        fields: list[str] = None,
-        date_created_start: str = None,
-        date_created_end: str = None,
-    ):
-        query = self.create_has_related_custom_activity_query(custom_activity_type_id)
-        leads = self.search(query, fields=fields)
-        print(f"{len(leads)} leads")
-        endpoint_and_params_list = [
-            (
-                "activity/custom",
-                {
-                    "lead_id": lead["id"],
-                    "custom_activity_type_id": custom_activity_type_id,
-                    "date_created__gt": date_created_start,
-                    "date_created__lt": date_created_end,
-                },
-            )
-            for lead in leads
-        ]
-        custom_activity_instances, errors = await self.get_all_concurrently(
-            endpoint_and_params_list, verbose=True
-        )
-        print(f"{len(custom_activity_instances)} custom activity instances")
-        if errors:
-            print(f"{len(errors)} errors")
-
-        return leads, custom_activity_instances
-
     async def get_custom_activity_instances(
         self,
         custom_activity_type_id: str,
-        date_created_start: str = None,
-        date_created_end: str = None,
+        custom_activity_fields: list[str] | None = None,
+        sort: list[dict[str, str | dict[str, str]]] | None = None,
     ):
-        (
-            leads,
-            custom_activity_instances,
-        ) = await self.get_leads_with_custom_activity_instances(
-            custom_activity_type_id,
-            date_created_start=date_created_start,
-            date_created_end=date_created_end,
+        if sort is None:
+            sort = [
+                {
+                    "field": {
+                        "type": "regular_field",
+                        "object_type": "activity.custom_activity",
+                        "field_name": "date_created",
+                    },
+                    "direction": "asc",
+                }
+            ]
+
+        query = self.build_custom_activity_type_id_query(custom_activity_type_id)
+
+        return await asyncio.to_thread(
+            self.search,
+            query,
+            sort,
+            fields=custom_activity_fields,
+            object_type="activity.custom_activity",
         )
-        custom_activity_instances.sort(key=lambda x: x["date_created"])
-        return custom_activity_instances
 
-    async def get_leads_with_custom_activity_instances_and_opportunities(
-        self, custom_activity_type_id: str
-    ):
-        (
-            leads,
-            custom_activity_instances,
-        ) = await self.get_leads_with_custom_activity_instances(
-            custom_activity_type_id, fields=["id", "opportunities"]
-        )
+    async def get_leads_with_custom_activity_instances(
+        self,
+        custom_activity_type_id: str,
+        date_created_range: tuple[date, date] | None = None,
+        lead_fields: list[str] | None = None,
+        custom_activity_fields: list[str] | None = None,
+        sort: list[dict[str, str | dict[str, str]]] | None = None,
+        verbose: bool = False,
+    ) -> list[dict[str, Any]]:
+        if sort is None:
+            sort = [
+                {
+                    "field": {
+                        "type": "regular_field",
+                        "object_type": "lead",
+                        "field_name": "date_created",
+                    },
+                    "direction": "asc",
+                }
+            ]
 
-        # Create a mapping of lead_id to lead object
-        lead_mapping = {lead["id"]: lead for lead in leads}
+        query = self.build_has_related_custom_activity_query(custom_activity_type_id)
 
-        # Allocate custom_activity_instances to each lead
+        leads = self.search(query, sort=sort, fields=lead_fields)
+        if verbose:
+            print(
+                f"Found {len(leads)} leads that have custom activity instances of type {custom_activity_type_id}"
+            )
+
+        # Break leads into lists of max 100 lead IDs each
+        chunk_size = 100
+        lead_id_chunks = [
+            [lead["id"] for lead in leads[i : i + chunk_size]]
+            for i in range(0, len(leads), chunk_size)
+        ]
+        if verbose:
+            print(f"Split {len(leads)} leads into {len(lead_id_chunks)} chunks")
+
+        if date_created_range:
+            start_date, end_date = date_created_range
+            if not all(isinstance(x, date) for x in (start_date, end_date)):
+                raise ValueError(
+                    f"Invalid date range: {start_date} ({type(start_date)}) – {end_date} ({type(end_date)})"
+                )
+        else:
+            start_date = None
+            end_date = None
+
+        def build_query(lead_ids: list[str]) -> dict:
+            # Base queries that are always included
+            queries = [
+                {
+                    "type": "object_type",
+                    "object_type": "activity.custom_activity",
+                },
+                {
+                    "type": "field_condition",
+                    "field": {
+                        "type": "regular_field",
+                        "object_type": "activity.custom_activity",
+                        "field_name": "lead_id",
+                    },
+                    "condition": {
+                        "type": "reference",
+                        "reference_type": "lead",
+                        "object_ids": lead_ids,
+                    },
+                },
+                self.build_custom_activity_type_id_query(custom_activity_type_id),
+            ]
+
+            if start_date and end_date:
+                # Add date range query if dates are provided
+                date_query = self.build_date_range_query(
+                    "activity.custom_activity",
+                    "date_created",
+                    start_date,
+                    end_date,
+                )
+                queries.append(date_query)
+
+            return {
+                "query": {
+                    "type": "and",
+                    "queries": queries,
+                },
+                "sort": [
+                    {
+                        "field": {
+                            "type": "regular_field",
+                            "object_type": "activity.custom_activity",
+                            "field_name": "date_created",
+                        },
+                        "direction": "asc",
+                    }
+                ],
+                "_fields": {"activity.custom_activity": custom_activity_fields}
+                if custom_activity_fields
+                else None,
+                "_limit": 200,
+            }
+
+        endpoint_and_data_list = [
+            ("data/search", build_query(lead_ids)) for lead_ids in lead_id_chunks
+        ]
+
+        responses, errors = await self.post_all(endpoint_and_data_list, 5, verbose)
+
+        if any(response.get("cursor") for response in responses):
+            raise ValueError(
+                "Some search results were not fetched due to pagination limits. Reduce chunk size and try again."
+            )
+
+        custom_activity_instances = [
+            instance for response in responses for instance in response["data"]
+        ]
+
+        if verbose:
+            print(
+                f"Found {len(custom_activity_instances)} custom activity instances of type {custom_activity_type_id}"
+            )
+        if errors:
+            raise Exception(
+                f"{len(errors)} errors while fetching custom activity instances for leads: {errors}"
+            )
+
+        # Create a mapping of lead_id to instances
+        instances_by_lead = {}
         for instance in custom_activity_instances:
-            lead_id = instance["lead_id"]
-            if lead_id in lead_mapping:
-                if "custom_activity_instances" not in lead_mapping[lead_id]:
-                    lead_mapping[lead_id]["custom_activity_instances"] = []
-                lead_mapping[lead_id]["custom_activity_instances"].append(instance)
+            instances_by_lead.setdefault(instance["lead_id"], []).append(instance)
 
-        # Convert the mapping back to a list of leads
-        leads_with_activities = list(lead_mapping.values())
-        return leads_with_activities
+        # Each lead should have at least one custom activity instance since we searched for leads with instances
+        # in `build_has_related_custom_activity_query`. If any are missing, something has gone wrong.
+        return [
+            {**lead, "custom_activity_instances": instances_by_lead[lead["id"]]}
+            for lead in leads
+        ]
 
     def get_last_lead_qualification(self, lead_id: str, verbose: bool) -> dict | None:
         lead_qualification_custom_activity_type_id = self.get_custom_activity_type_id(

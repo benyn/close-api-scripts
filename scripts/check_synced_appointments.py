@@ -202,6 +202,7 @@ def diff_appointments_and_custom_activity_instances(
 async def main():
     appointments, procedure_custom_activity_instances = await asyncio.gather(
         fetch_appointments(325747),
+        # TODO: Specify fields since this now returns bare minimum fields
         close.get_custom_activity_instances(procedure_custom_activity_type_id),
     )
 

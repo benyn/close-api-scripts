@@ -2,10 +2,9 @@ import argparse
 import asyncio
 import json
 import logging
+
 from CloseApiWrapper import CloseApiWrapper
-
 from utils.get_api_key import get_api_key
-
 
 parser = argparse.ArgumentParser(
     description="Export Close custom activity instances within a date range into a JSON file"
@@ -52,6 +51,7 @@ async def main():
     custom_field_id_name_mapping = api.get_custom_field_id_name_mapping(
         f"activity/{custom_activity_type_id}"
     )
+    # TODO: Specify fields since this now returns bare minimum fields
     custom_activity_instances = await api.get_custom_activity_instances(
         custom_activity_type_id
     )

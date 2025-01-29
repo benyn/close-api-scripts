@@ -71,9 +71,11 @@ async def main():
         args.custom_activity_type
     )
     if not custom_activity_type_id:
-        print(f"Custom Activity type not found")
-        return
+        raise ValueError(
+            f"Custom Activity type '{args.custom_activity_type}' not found"
+        )
 
+    # TODO: Specify fields since this now returns bare minimum fields
     instances = await close.get_custom_activity_instances(custom_activity_type_id)
     duplicates = find_duplicates(instances)
     if args.verbose:
